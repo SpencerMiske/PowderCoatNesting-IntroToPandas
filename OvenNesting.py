@@ -29,46 +29,65 @@ def addToBatch(jobID, paintID, thickness, metal):
 for index, row in jobs.iterrows():
     addToBatch(row.iloc[0], row.iloc[1], row.iloc[3], row.iloc[2])
 
+#Lists all jobs
 for item in batchable:
     print(item)
 
+#Batching loop
 while batchable:
+    #Waits for user input
     input("Next Batch?")
+
+    #initializing Variables
     nextUp = []
     jobUp = batchable.pop(0)
     nextUp.append(jobUp)
-    minTime = jobUp[2]
-    maxTime = jobUp[3]
-    
-    i = 0
-    while i < len(batchable) and len(nextUp) < BATCH_SIZE_LIMIT:
-        if jobUp[1] == batchable[i][1]:
-            if int(batchable[i][3]) > minTime and int(batchable[i][2]) < maxTime:
-                if int(batchable[i][3]) < maxTime: maxTime = int(batchable[i][3])
-                if int(batchable[i][2]) > minTime: minTime = int(batchable[i][2])
-                nextUp.append(batchable.pop(i))
-                i -= 1
-        i += 1
+    maxHeatUpTime = jobUp[2] + 1.5
 
+    #Checks if paint type exists
     paintRow = curingTimes[curingTimes.iloc[:, 0] == jobUp[1]].index
     if len(paintRow) == 0:
         print(f"No matching paint row found for job {jobUp[1]}.")
         continue
     
     paintRow = paintRow[0]
-    
+
+    #Checks for valid oven temp
     paintTime = -9999
-    if curingTimes.loc[paintRow, 'min400'] != -9999: paintTime = curingTimes.loc[paintRow, 'min400']
-    elif curingTimes.loc[paintRow, 'min375'] != -9999: paintTime = curingTimes.loc[paintRow, 'min375']
-    elif curingTimes.loc[paintRow, 'min350'] != -9999: paintTime = curingTimes.loc[paintRow, 'min350']
+    if curingTimes.loc[paintRow, 'min400'] != -9999:
+        heat = "400"
+        paintTime = curingTimes.loc[paintRow, 'min400']
+        tolerence = (curingTimes.loc[paintRow, 'max400'] - paintTime)/2
+    elif curingTimes.loc[paintRow, 'min375'] != -9999:
+        heat = "375"
+        paintTime = curingTimes.loc[paintRow, 'min375']
+        tolerence = (curingTimes.loc[paintRow, 'max375'] - paintTime)/2
+    elif curingTimes.loc[paintRow, 'min350'] != -9999:
+        heat = "350"
+        paintTime = curingTimes.loc[paintRow, 'min350']
+        tolerence = (curingTimes.loc[paintRow, 'max350'] - paintTime)/2
 
     if paintTime == -9999:
         print("No valid paint time found for job.")
         continue
 
+    #Checking if any jobs can fit with the first job in queue
+    i = 0
+    while i < len(batchable) and len(nextUp) < BATCH_SIZE_LIMIT:
+        #If paint ID matches
+        if jobUp[1] == batchable[i][1]:
+            if (batchable[i][2] - jobUp[2]) > -tolerence and (batchable[i][2] - jobUp[2]) < tolerence:
+                if batchable[i][2] > jobUp[2]:
+                    maxHeatUpTime = batchable[i][2] + 1.5
+                nextUp.append(batchable.pop(i))
+                i -= 1
+        i += 1
+
     for item in nextUp:
         print(str(item[0]) + " " + str(item[1]))
 
-    print("Predicted batch time: " + str((((maxTime + minTime) / 2) + paintTime)))
+    print("Cook at " + heat + " for " + str(maxHeatUpTime + paintTime))
+
+#ADD PREDICTED TIME
 
 print("All done!")
